@@ -21,60 +21,66 @@
 int main() {
     hittable_list world;
 
-    auto ground_material = make_shared<lambertian>(color(0.5, 0.5, 0.5));
-    world.add(make_shared<sphere>(point3(0,-1000,0), 1000, ground_material));
-
-    for (int a = -11; a < 11; a++) {
-        for (int b = -11; b < 11; b++) {
-            auto choose_mat = random_double();
-            point3 center(a + 0.9*random_double(), 0.2, b + 0.9*random_double());
-
-            if ((center - point3(4, 0.2, 0)).length() > 0.9) {
-                shared_ptr<material> sphere_material;
-
-                if (choose_mat < 0.8) {
-                    // diffuse
-                    auto albedo = color::random() * color::random();
-                    sphere_material = make_shared<lambertian>(albedo);
-                    world.add(make_shared<sphere>(center, 0.2, sphere_material));
-                } else if (choose_mat < 0.95) {
-                    // metal
-                    auto albedo = color::random(0.5, 1);
-                    auto fuzz = random_double(0, 0.5);
-                    sphere_material = make_shared<metal>(albedo, fuzz);
-                    world.add(make_shared<sphere>(center, 0.2, sphere_material));
-                } else {
-                    // glass
-                    sphere_material = make_shared<dielectric>(1.5);
-                    world.add(make_shared<sphere>(center, 0.2, sphere_material));
-                }
-            }
+    // Chão de esferas de metal
+    auto ground_material = make_shared<metal>(color(0.8, 0.8, 0.8), 0);
+    for (int a = -10; a < 10; a++) {
+        for (int b = -10; b < 10; b++) {
+            point3 center(a, -0.5, b);
+            world.add(make_shared<sphere>(center, 0.5, ground_material));
         }
     }
 
-    auto material1 = make_shared<dielectric>(1.5);
-    world.add(make_shared<sphere>(point3(0, 1, 0), 1.0, material1));
+    // Materiais
+    auto spiral1_material = make_shared<lambertian>(color(0.9, 0.1, 0.1));  // Vermelho difuso
+    auto spiral2_material = make_shared<metal>(color(0.1, 0.9, 0.1), 0.0);  // Verde espelhado
+    auto glass_material = make_shared<dielectric>(1.5);  // Vidro
 
-    auto material2 = make_shared<lambertian>(color(0.4, 0.2, 0.1));
-    world.add(make_shared<sphere>(point3(-4, 1, 0), 1.0, material2));
+    const int spiral_steps = 80;
+    const double spiral_radius = 4.5;
+    const double spiral_height = 10.0;
+    const double spiral_turns = 3.0;
 
-    auto material3 = make_shared<metal>(color(0.7, 0.6, 0.5), 0.0);
-    world.add(make_shared<sphere>(point3(4, 1, 0), 1.0, material3));
+    // Espiral externa vermelha
+    for (int i = 0; i < spiral_steps; i++) {
+        double t = double(i) / spiral_steps;
+        double angle = t * spiral_turns * 2 * pi;
+        double x = spiral_radius * cos(angle);
+        double z = spiral_radius * sin(angle);
+        double y = t * spiral_height;
+        
+        world.add(make_shared<sphere>(point3(x, y, z), 0.5, spiral1_material));
+    }
+
+    // Espiral interna verde
+    for (int i = 0; i < spiral_steps; i++) {
+        double t = double(i) / spiral_steps;
+        double angle = t * (spiral_turns + 0.3) * 2 * pi;
+        double x = (spiral_radius * 0.6) * cos(angle);
+        double z = (spiral_radius * 0.6) * sin(angle);
+        double y = t * spiral_height + 0.3;
+        
+        world.add(make_shared<sphere>(point3(x, y, z), 0.35, spiral2_material));
+    }
+
+    // Pilar central de esferas de vidro
+    for (int i = 0; i < 10; i++) {
+        double y = i * 1.1;
+        world.add(make_shared<sphere>(point3(0, y, 0), 1.2, glass_material));
+    }
 
     camera cam;
 
-    cam.aspect_ratio      = 16.0 / 9.0;
-    cam.image_width       = 1200;
-    cam.samples_per_pixel = 10;
-    cam.max_depth         = 20;
+    cam.aspect_ratio      = 16/9;
+    cam.image_width       = 600;
+    cam.samples_per_pixel = 100;
+    cam.max_depth         = 50;
 
-    cam.vfov     = 20;
-    cam.lookfrom = point3(13,2,3);
-    cam.lookat   = point3(0,0,0);
-    cam.vup      = vec3(0,1,0);
+    cam.vfov     = 50;
+    cam.lookfrom = point3(0, 5, 10);
+    cam.lookat   = point3(0, spiral_height/2, 0);
+    cam.vup      = vec3(0, 1, 0);
 
-    cam.defocus_angle = 0.6;
-    cam.focus_dist    = 10.0;
+    cam.focus_dist    = (cam.lookfrom - cam.lookat).length();
 
     cam.render(world);
 }
